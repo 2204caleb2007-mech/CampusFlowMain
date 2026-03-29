@@ -1,0 +1,26 @@
+# Environment variables (contains API keys — never commit this)
+.env
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CampusBot Specifics
+autonomy_logs.json
+token.json
+client_secret.json
+*.pdf
+/tmp/
+agent/tools/__pycache__/

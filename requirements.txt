@@ -1,0 +1,9 @@
+groq
+streamlit
+python-dotenv
+PyMuPDF
+gspread
+google-auth
+google-auth-oauthlib
+google-api-python-client
+requests
