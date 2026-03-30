@@ -135,7 +135,7 @@ def synthesize_answer(query: str, search_data: dict,
             "Cite sources briefly at the end (title + URL). "
             "Keep the answer focused and under 400 words."
         )
-    elif role == "teaching_assistant":
+    elif role == "teacher":
         response_guidance = (
             "Give a clear, accurate, and professional answer suitable for instructional use. "
             "Structure the answer with clear sections. "

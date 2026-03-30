@@ -24,6 +24,39 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _seed_academic_calendar():
+    """Populate exam dates dynamically (current year) on first run."""
+    import datetime as _dt
+    year = _dt.date.today().year
+    exam_dates = [
+        (f"{year}-04-15", "EXAM", "Semester Exam Day 1"),
+        (f"{year}-04-16", "EXAM", "Semester Exam Day 2"),
+        (f"{year}-04-17", "EXAM", "Semester Exam Day 3"),
+        (f"{year}-04-18", "EXAM", "Semester Exam Day 4"),
+        (f"{year}-04-22", "EXAM", "Semester Exam Day 5"),
+        (f"{year}-04-23", "EXAM", "Semester Exam Day 6"),
+    ]
+    conn = get_conn()
+    now = _dt.datetime.now().isoformat()
+    with conn:
+        for date, etype, name in exam_dates:
+            conn.execute(
+                "INSERT OR IGNORE INTO academic_calendar (event_type, event_name, date, created_at) VALUES (?,?,?,?)",
+                (etype, name, date, now),
+            )
+    conn.close()
+
+
+def get_exam_dates() -> list[str]:
+    """Return all exam dates from DB (replaces hardcoded EXAM_DATES list)."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT date FROM academic_calendar WHERE event_type='EXAM'"
+    ).fetchall()
+    conn.close()
+    return [r["date"] for r in rows]
+
+
 def init_db():
     """Create all tables if they don't exist."""
     conn = get_conn()
@@ -34,6 +67,7 @@ def init_db():
             title       TEXT,
             created_at  TEXT,
             role        TEXT DEFAULT 'student',
+            user_id     TEXT,
             workflow_type TEXT
         );
 
@@ -55,7 +89,9 @@ def init_db():
             policy_reason   TEXT,
             alternatives    TEXT,
             created_at      TEXT,
-            updated_at      TEXT
+            updated_at      TEXT,
+            retry_count     INTEGER DEFAULT 0,
+            last_attempt    TEXT
         );
 
         CREATE TABLE IF NOT EXISTS logs (
@@ -86,29 +122,78 @@ def init_db():
             outcome         TEXT,
             loops_used      INTEGER
         );
+
+        CREATE TABLE IF NOT EXISTS bookings (
+            id            TEXT PRIMARY KEY,
+            resource_id   TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            date          TEXT NOT NULL,
+            time_slot     TEXT NOT NULL,
+            session_id    TEXT,
+            status        TEXT DEFAULT 'confirmed',
+            created_at    TEXT,
+            expires_at    TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS academic_calendar (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type  TEXT NOT NULL,
+            event_name  TEXT,
+            date        TEXT NOT NULL UNIQUE,
+            created_at  TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS scheduler_logs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_name    TEXT NOT NULL,
+            executed_at TEXT NOT NULL,
+            outcome     TEXT,
+            detail      TEXT
+        );
         """)
+        
+        # ── Migration: Add user_id if missing and assign old chats to admin ──
+        try:
+            conn.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT")
+            conn.execute("UPDATE sessions SET user_id='admin' WHERE user_id IS NULL")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+            
     conn.close()
+    _seed_academic_calendar()
 
 
 # ── SESSION CRUD ─────────────────────────────────────────────────
 
 def create_session(session_id: str, title: str, role: str = "student",
-                   workflow_type: str = "") -> None:
+                   workflow_type: str = "", user_id: str = "") -> None:
     now = datetime.datetime.now().isoformat()
     conn = get_conn()
     with conn:
         conn.execute(
-            "INSERT OR IGNORE INTO sessions (id, title, created_at, role, workflow_type) VALUES (?,?,?,?,?)",
-            (session_id, title, now, role, workflow_type)
+            "INSERT OR IGNORE INTO sessions (id, title, created_at, role, user_id, workflow_type) VALUES (?,?,?,?,?,?)",
+            (session_id, title, now, role, user_id, workflow_type)
         )
     conn.close()
 
 
-def list_sessions() -> list[dict]:
+def list_sessions(user_id: str = None, role: str = None) -> list[dict]:
+    """Retrieve chat sessions via user access rules."""
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM sessions ORDER BY created_at DESC"
-    ).fetchall()
+    
+    if role == "admin":
+        # Admin sees everything
+        rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC").fetchall()
+    elif user_id:
+        # Others see only their own sessions
+        rows = conn.execute(
+            "SELECT * FROM sessions WHERE user_id=? ORDER BY created_at DESC", 
+            (user_id,)
+        ).fetchall()
+    else:
+        # Fallback
+        rows = []
+        
     conn.close()
     return [dict(r) for r in rows]
 
@@ -289,6 +374,92 @@ def get_kpi_summary() -> dict:
         "avg_resolution_mins": round(avg_mins, 1),
         "by_workflow": by_type,
     }
+
+
+# ── BOOKING CRUD (persistent, replaces in-memory dicts) ──────────
+
+def is_slot_booked(resource_id: str, date: str, time_slot: str) -> bool:
+    """Check DB for a confirmed booking collision."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id FROM bookings WHERE resource_id=? AND date=? AND time_slot=? AND status='confirmed'",
+        (resource_id.upper(), date, time_slot),
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+def create_booking(resource_id: str, resource_type: str, date: str,
+                   time_slot: str, session_id: str = "") -> str:
+    """Persist a confirmed booking. Returns booking id."""
+    import uuid as _uuid
+    bid = str(_uuid.uuid4())
+    now = datetime.datetime.now().isoformat()
+    # Bookings expire after 24h for lab/room; extend if needed
+    expires = (datetime.datetime.now() + datetime.timedelta(hours=24)).isoformat()
+    conn = get_conn()
+    with conn:
+        conn.execute(
+            """INSERT OR IGNORE INTO bookings
+               (id, resource_id, resource_type, date, time_slot, session_id, status, created_at, expires_at)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (bid, resource_id.upper(), resource_type, date, time_slot, session_id, "confirmed", now, expires),
+        )
+    conn.close()
+    return bid
+
+
+def expire_old_bookings() -> int:
+    """Mark bookings past their expires_at as expired. Returns count changed."""
+    now = datetime.datetime.now().isoformat()
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE bookings SET status='expired' WHERE expires_at < ? AND status='confirmed'", (now,)
+    )
+    count = cur.rowcount
+    conn.commit()
+    conn.close()
+    return count
+
+
+# ── RETRY CRUD (structured — no string parsing) ───────────────────
+
+def increment_retry(req_id: str) -> int:
+    """Bump retry_count and last_attempt. Returns new retry count."""
+    now = datetime.datetime.now().isoformat()
+    conn = get_conn()
+    conn.execute(
+        "UPDATE requests SET retry_count = retry_count + 1, last_attempt=?, status='pending' WHERE id=?",
+        (now, req_id),
+    )
+    row = conn.execute("SELECT retry_count FROM requests WHERE id=?", (req_id,)).fetchone()
+    conn.commit()
+    conn.close()
+    return row["retry_count"] if row else 0
+
+
+# ── SCHEDULER LOG ──────────────────────────────────────────────────
+
+def log_scheduler_job(job_name: str, outcome: str, detail: str = "") -> None:
+    """Write a structured scheduler job log entry."""
+    now = datetime.datetime.now().isoformat()
+    conn = get_conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO scheduler_logs (job_name, executed_at, outcome, detail) VALUES (?,?,?,?)",
+            (job_name, now, outcome, detail),
+        )
+    conn.close()
+
+
+def get_scheduler_logs(limit: int = 50) -> list[dict]:
+    """Return recent scheduler log entries for UI display."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM scheduler_logs ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 # ── INIT ON IMPORT ───────────────────────────────────────────────

@@ -7,3 +7,7 @@ google-auth
 google-auth-oauthlib
 google-api-python-client
 requests
+apscheduler
+tavily-python
+fastmcp
+reportlab

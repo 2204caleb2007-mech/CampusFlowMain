@@ -18,7 +18,7 @@ Analyze the request message and extract a structured JSON schema.
 
 Classify into one of these workflows:
 - lab_booking: student wants to book a computer/electronics/physics/CAD/software lab
-- leave_request: student wants leave, medical, emergency, holiday, sick day
+- leave_request: student wants leave, medical, emergency, holiday, sick day, on duty (OD), hackathon, event
 - room_booking: student wants to book a seminar hall, conference room, event space
 - complaint: student reporting an issue, maintenance problem, facility complaint
 - web_search: student asking an academic doubt, subject question, general knowledge, or internet query
@@ -29,7 +29,7 @@ For lab_booking:
 {"type":"lab_booking","student_id":"STU001","lab_id":"LAB204","date":"YYYY-MM-DD","time_slot":"HH:MM-HH:MM","purpose":"","course_code":""}
 
 For leave_request:
-{"type":"leave_request","student_id":"STU001","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","reason":"","requires_hod":false}
+{"type":"leave_request","student_id":"STU001","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","reason":"sick | personal | on_duty | holiday","requires_hod":false}
 
 For room_booking:
 {"type":"room_booking","organizer_id":"STU001","room_id":"SEMINAR_HALL_A","date":"YYYY-MM-DD","time_slot":"HH:MM-HH:MM","event_name":"","expected_attendees":30}
@@ -64,9 +64,20 @@ def classify_with_llm(text: str, client, model: str, role: str = "student") -> d
     try:
         # Build role-aware system prompt by injecting role context
         role_prompt = role_system.get_role_system_prompt(role, {"workflow_type": "classification"})
+        
+        # Inject the active user so the LLM doesn't hallucinate "STU001"
+        try:
+            import streamlit as _st
+            auth_user = _st.session_state.get("username", "STU001")
+            if not auth_user: auth_user = "STU001"
+        except Exception:
+            auth_user = "STU001"
+            
+        customized_base = CLASSIFIER_PROMPT_BASE.replace("STU001", auth_user)
+
         full_system_prompt = f"""{role_prompt}
 
-{CLASSIFIER_PROMPT_BASE}"""
+{customized_base}"""
         
         response = client.chat.completions.create(
             model=model,
@@ -113,15 +124,25 @@ def _keyword_fallback(text: str) -> dict:
             "course_code": "",
         }
 
-    # Leave/medical keywords
+    # Leave/medical/OD keywords
     if any(k in t for k in ["leave", "sick", "medical", "fever", "hospital",
-                              "emergency", "holiday", "absent", "attendance"]):
+                              "emergency", "holiday", "absent", "attendance", "on duty", "od", "hackathon"]):
+        reason = "personal"
+        if any(k in t for k in ["sick", "medical", "fever", "hospital"]): reason = "sick"
+        if any(k in t for k in ["on duty", "od", "hackathon"]): reason = "on_duty"
+        
+        try:
+            import streamlit as _st
+            auth_user = _st.session_state.get("username", "STU001")
+        except Exception:
+            auth_user = "STU001"
+
         return {
             "type": "leave_request",
-            "student_id": "STU001",
+            "student_id": auth_user,
             "start_date": "2026-04-05",
             "end_date": "2026-04-05",
-            "reason": "personal",
+            "reason": reason,
             "requires_hod": False,
         }
 

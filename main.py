@@ -17,7 +17,9 @@ import datetime
 import streamlit as st
 from dotenv import load_dotenv
 from groq import Groq
-from campus import db, executor, role_system
+from campus import db, executor, role_system, policy_engine, auth, pdf_exporter
+from campus.llm_orchestrator import LLMOrchestrator
+from scheduler.jobs import start_scheduler, JOB_STATUS
 
 load_dotenv()
 
@@ -33,6 +35,58 @@ if "active_session_id"  not in st.session_state: st.session_state["active_sessio
 if "active_page"        not in st.session_state: st.session_state["active_page"]        = "Dashboard"
 if "rename_session_id"  not in st.session_state: st.session_state["rename_session_id"]  = None
 if "user_role"          not in st.session_state: st.session_state["user_role"]          = "student"
+if "authenticated"      not in st.session_state: st.session_state["authenticated"]      = False
+if "username"           not in st.session_state: st.session_state["username"]           = None
+
+try:
+    auth.init_auth_db()
+except Exception:
+    pass
+
+if not st.session_state.get("authenticated", False):
+    st.title("CampusFlow Authentication", anchor=False)
+    st.subheader("Autonomous Campus Agent", anchor=False)
+    st.divider()
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        tab_login, tab_reg = st.tabs(["Login", "Register"])
+        with tab_login:
+            with st.form("login_form"):
+                l_usr = st.text_input("Username")
+                l_pwd = st.text_input("Password", type="password")
+                if st.form_submit_button("Login", use_container_width=True, type="primary"):
+                    ok, role = auth.verify_login(l_usr, l_pwd)
+                    if ok:
+                        st.session_state["authenticated"] = True
+                        st.session_state["username"] = l_usr
+                        st.session_state["user_role"] = role
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password.")
+        with tab_reg:
+            with st.form("register_form"):
+                r_usr = st.text_input("Username")
+                r_pwd = st.text_input("Password", type="password")
+                r_pw2 = st.text_input("Confirm Password", type="password")
+                r_role_display = st.selectbox("Role", ["Student", "Teacher"])
+                if st.form_submit_button("Register", use_container_width=True):
+                    if r_pwd != r_pw2:
+                        st.error("Passwords do not match!")
+                    else:
+                        r_role = "student" if r_role_display == "Student" else "teacher"
+                        ok, msg = auth.register_user(r_usr, r_pwd, role=r_role)
+                        if ok:
+                            st.success("Registration successful! Please switch to Login tab.")
+                        else:
+                            st.error(f"Registration Failed: {msg}")
+    st.stop()
+
+# ── BACKGROUND SCHEDULER (Starts via module-level singleton) ─────
+try:
+    start_scheduler()
+except Exception:
+    pass
 
 # ── STEP ICONS AND LABELS ─────────────────────────────────────────
 STEP_ICONS = {
@@ -66,35 +120,49 @@ def render_steps(statuses, container):
             icon = STEP_ICONS.get(status, "○")
             label = STEP_LABELS[i]
             desc = STEP_DESCRIPTIONS.get(key, "")
-            # Colourful CSS Logic matching states
+            # Modern CSS variables for states
             if status == "active":
-                bg = "linear-gradient(135deg, rgba(255,193,7,0.2) 0%, rgba(255,193,7,0.05) 100%)"
-                border = "1px solid rgba(255,193,7, 0.8)"
-                shadow = "0 0 15px rgba(255,193,7,0.4)"
-                text_color = "#ffc107"
+                bg = "rgba(138, 43, 226, 0.15)" # Purple highlight
+                border = "2px solid rgba(138, 43, 226, 0.8)"
+                shadow = "0 4px 12px rgba(138, 43, 226, 0.3)"
+                text_color = "#b088f5"
+                icon = "🤖"
             elif status == "done":
-                bg = "linear-gradient(135deg, rgba(0,230,118,0.2) 0%, rgba(0,230,118,0.05) 100%)"
-                border = "1px solid rgba(0,230,118, 0.5)"
-                shadow = "0 0 10px rgba(0,230,118,0.2)"
-                text_color = "#00e676"
+                bg = "rgba(40, 167, 69, 0.1)"
+                border = "1px solid rgba(40, 167, 69, 0.5)"
+                shadow = "0 2px 8px rgba(40, 167, 69, 0.1)"
+                text_color = "#4ade80"
+                icon = "✓"
             elif status == "failed":
-                bg = "linear-gradient(135deg, rgba(255,23,68,0.2) 0%, rgba(255,23,68,0.05) 100%)"
-                border = "1px solid rgba(255,23,68, 0.8)"
-                shadow = "0 0 15px rgba(255,23,68,0.4)"
-                text_color = "#ff1744"
-            else: # pending / default
-                bg = "rgba(255,255,255,0.03)"
-                border = "1px solid rgba(255,255,255,0.1)"
+                bg = "rgba(220, 53, 69, 0.1)"
+                border = "1px solid rgba(220, 53, 69, 0.6)"
+                shadow = "0 4px 12px rgba(220, 53, 69, 0.2)"
+                text_color = "#f87171"
+                icon = "✕"
+            else:
+                bg = "rgba(255, 255, 255, 0.02)"
+                border = "1px solid rgba(255, 255, 255, 0.1)"
                 shadow = "none"
-                text_color = "#888"
+                text_color = "#6b7280"
+                icon = "○"
 
             col.markdown(
-                f"""<div style="background:{bg}; border:{border}; box-shadow:{shadow}; padding:14px 10px; border-radius:12px; text-align:center; transition: all 0.3s ease;">
-                    <div style="font-size: 28px; color:{text_color}; text-shadow: {shadow};">{icon}</div>
-                    <div style="font-weight: 800; margin-top: 6px; color:{text_color}; letter-spacing: 1px;">{label}</div>
-                    <div style="font-size: 11px; margin-top: 4px; opacity: 0.9; color: #ddd;">{desc}</div>
-                    <div style="font-size: 10px; margin-top: 10px; font-weight:bold; color:{text_color}; background:rgba(0,0,0,0.3); display:inline-block; padding:3px 10px; border-radius:12px;">{status.upper()}</div>
-                </div>""",
+                f"""
+                <div style="background:{bg}; border:{border}; box-shadow:{shadow}; 
+                            padding:16px 10px; border-radius:12px; text-align:center; 
+                            transition: all 0.3s ease; height:100%; display:flex; 
+                            flex-direction:column; justify-content:center; align-items:center;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">{icon}</div>
+                    <div style="font-weight: 700; color:{text_color}; letter-spacing: 1px; font-size: 14px;">{label}</div>
+                    <div style="font-size: 11px; margin-top: 6px; color:#9ca3af;">{desc}</div>
+                    <div style="margin-top: auto; padding-top: 12px;">
+                        <span style="font-size: 10px; font-weight:700; color:{text_color}; 
+                                     background:rgba(0,0,0,0.4); padding:3px 10px; border-radius:12px;">
+                            {status.upper()}
+                        </span>
+                    </div>
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
 
@@ -236,26 +304,18 @@ with st.sidebar:
                 help="llama-3.3-70b recommended",
             )
 
-            role_choices = role_system.get_role_choices()
-            role_keys = [r[0] for r in role_choices]
-            role_labels = [r[1] for r in role_choices]
+            usr = st.session_state.get('username', 'Unknown')
+            cur_role = st.session_state.get('user_role', 'student')
+            st.markdown(f"**User**: `{usr}`")
             
-            current_index = role_keys.index(st.session_state["user_role"]) if st.session_state["user_role"] in role_keys else 0
+            role_disp = role_system.ROLES.get(cur_role, {}).get('display_name', cur_role.title())
+            st.markdown(f"**Role**: `{role_disp}`")
             
-            role = st.selectbox(
-                "Your Role",
-                options=role_keys,
-                index=current_index,
-                format_func=lambda x: role_system.ROLES[x]['display_name'],
-                help="Role controls AI behavior, tone, and data visibility",
-            )
-            
-            # Show role description
-            role_desc = role_system.ROLES[role]["description"]
-            st.caption(f"_{role_desc}_")
-            
-            if role != st.session_state["user_role"]:
-                st.session_state["user_role"] = role
+            if cur_role in role_system.ROLES:
+                st.caption(f"_{role_system.ROLES[cur_role]['description']}_")
+                
+            if st.button("Logout", use_container_width=True):
+                st.session_state.clear()
                 st.rerun()
 
     st.divider()
@@ -270,7 +330,10 @@ with st.sidebar:
             st.session_state.pop("idea_input", None)
             st.rerun()
 
-    sessions = db.list_sessions()
+    sessions = db.list_sessions(
+        user_id=st.session_state.get('username'), 
+        role=st.session_state.get('user_role')
+    )
 
     if not sessions:
         st.caption("No chats yet. Submit a query to start.")
@@ -380,7 +443,7 @@ if st.session_state["active_page"] == "Automation":
                             wt.replace("_"," ").title(),
                             f"{stats['resolved']}/{stats['total']} resolved"
                         )
-            elif user_role == "teaching_assistant":
+            elif user_role == "teacher":
                 k1, k2 = st.columns(2)
                 k1.metric("Total Requests",       kpis.get("total_requests", 0))
                 k2.metric("Resolution Rate",      f"{kpis.get('resolution_rate_pct', 0)}%")
@@ -476,7 +539,7 @@ if st.session_state["active_page"] == "Automation":
     # ── TAB 1: STUDENT TELEGRAM REPLY ────────────────────────────
     with tab_reply:
         if telegram_reply:
-            st.markdown("**Telegram Message Sent to Student:**")
+            st.markdown("**Message Sent to Student:**")
             st.markdown(
                 f'''<div style="background: #3a3a4a;
                             color: #eee;
@@ -616,6 +679,7 @@ LEAVE_EXAMPLES = [
     "Requesting sick leave for tomorrow, March 30th. I have a high fever and cannot attend college.",
     "I need a half-day leave this Friday afternoon (after 1 PM) to attend a government document verification appointment.",
     "I want to request leave for next whole week (April 12 to 16) due to severe chicken pox check. Send to HOD.",
+    "I am participating in a 2-day national hackathon this weekend and need an ON DUTY (OD) leave. Please escalate this.",
 ]
 LAB_EXAMPLES = [
     "I need to book the computer lab (Lab 204) on Friday 3–5 PM for a project demo with my team. Is it available?",
@@ -658,6 +722,26 @@ if display_messages:
     for msg in display_messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
+            
+    # Always provide an export button for existing chats
+    col_space, col_dl = st.columns([4, 1])
+    with col_dl:
+        pdf_bytes = pdf_exporter.generate_chat_pdf(
+            active_id, 
+            st.session_state.get("username", "Unknown"), 
+            st.session_state.get("user_role", "student")
+        )
+        if pdf_bytes:
+            filename = f"chat_{active_id[:8]}_{datetime.datetime.now().strftime('%H%M%S')}.pdf"
+            st.download_button(
+                label="📥 Download PDF",
+                data=pdf_bytes,
+                file_name=filename,
+                mime="application/pdf",
+                use_container_width=True,
+                type="secondary"
+            )
+
     st.caption("View full system details in the **Automation** tab above.")
 
 # ── INPUT ─────────────────────────────────────────────────────────
@@ -702,31 +786,61 @@ if run_button:
 
         # Live step tracker inside the assistant bubble
         step_container = st.container()
+        loop_label = st.empty()  # shows live loop counter + reviewer score
+        log_expander = st.expander("System Execution Logs", expanded=False)
+        log_view = log_expander.empty()
+        log_lines = []
         
         # Real-time state tracking
         loop_statuses = {"think": "pending", "plan": "pending", "execute": "pending", "review": "pending", "update": "pending"}
         render_steps(loop_statuses, step_container)
 
         def on_log(msg: str):
+            # ── Primary path: structured STEP_TOKEN signals ──────────────
+            if msg.startswith("STEP_TOKEN:"):
+                try:
+                    _, step_name, status = msg.split(":", 2)
+                    if step_name in loop_statuses:
+                        loop_statuses[step_name] = status
+                        render_steps(loop_statuses, step_container)
+                except Exception:
+                    pass
+                return  # don't show token lines as readable logs
+
+            # Append to collapsible logs
+            log_lines.append(format_log(msg))
+            log_view.markdown(
+                f"<div style='font-family:monospace;font-size:12px;'>{'<br>'.join(log_lines)}</div>", 
+                unsafe_allow_html=True
+            )
+
+            # ── Fallback: keyword parsing (for orchestrator/legacy paths) ─
             u_msg = msg.upper()
-            if "THINK" in u_msg:
-                loop_statuses["think"] = "active"
-            elif "PLAN" in u_msg:
+            if "THINK:" in u_msg and "active" not in u_msg.lower():
                 loop_statuses["think"] = "done"
-                loop_statuses["plan"] = "active"
-            elif "EXECUTE" in u_msg:
+            elif "PLAN:" in u_msg and "active" not in u_msg.lower():
                 loop_statuses["plan"] = "done"
-                loop_statuses["execute"] = "active"
-            elif "REVIEW" in u_msg:
-                loop_statuses["execute"] = "done"
-                loop_statuses["review"] = "active"
-            elif "UPDATE" in u_msg:
-                loop_statuses["review"] = "done"
-                loop_statuses["update"] = "active"
-            elif "DONE" in u_msg:
+            elif "EXECUTE:" in u_msg:
+                pass  # handled by STEP_TOKEN
+            elif "REVIEW:" in u_msg:
+                pass
+            elif "UPDATE:" in u_msg and "DONE" in u_msg:
                 loop_statuses["update"] = "done"
-            
-            # Re-render the 5 cards in real time
+
+            # Show retry + loop info in a compact banner
+            if "═══ Autonomous Loop" in msg:
+                loop_label.markdown(
+                    f"<small style='color:#ffc107; font-weight:bold;'>🔁 {msg.strip()}</small>",
+                    unsafe_allow_html=True,
+                )
+            elif "Score" in msg and "/10" in msg:
+                color = "#00e676" if "PASSED" in msg else "#ff1744"
+                loop_label.markdown(
+                    f"<small style='color:{color}; font-weight:bold;'>📊 {msg.strip()}</small>",
+                    unsafe_allow_html=True,
+                )
+
+            # Re-render cards after keyword fallback updates
             render_steps(loop_statuses, step_container)
 
     # Ensure session exists
@@ -734,21 +848,37 @@ if run_button:
     if not session_id:
         session_id = str(uuid.uuid4())
         title = query_text.strip()[:20] + ("..." if len(query_text.strip()) > 20 else "")
-        db.create_session(session_id, title, user_role)
+        db.create_session(
+            session_id, title, user_role, 
+            user_id=st.session_state.get("username", "admin")
+        )
         st.session_state["active_session_id"] = session_id
 
     client = Groq(api_key=api_key)
 
     with st.spinner("CampusFlow is handling your request autonomously..."):
         try:
-            result = executor.run(
+            # 1. Wrapper-Based Architecture (Non-Intrusive)
+            orchestrator = LLMOrchestrator(
+                api_key=api_key, 
+                model=model, 
+                tavily_key=tavily_key
+            )
+            
+            # Load DB history for orchestrator context
+            messages_db = db.get_messages(session_id)
+            # Take last 10 messages (5 turns)
+            chat_history = [
+                {"role": m["role"], "content": m["content"]}
+                for m in messages_db[-10:]
+            ]
+
+            result = orchestrator.process_request(
                 session_id=session_id,
                 query_text=query_text,
                 role=user_role,
-                client=client,
-                model=model,
-                tavily_api_key=tavily_key,
                 on_log=on_log,
+                chat_history=chat_history,
             )
         except Exception as e:
             st.error(f"**Agent error:** `{str(e)}`")
@@ -764,6 +894,25 @@ if run_button:
     # Save messages
     db.add_message(session_id, "user", query_text)
     db.add_message(session_id, "assistant", result["chat_reply"])
+
+    # ── Finalise step cards ───────────────────────────────────────
+    # Mark any unresolved cards as done (covers conversational paths
+    # that don't emit STEP_TOKENs for every step).
+    for k in loop_statuses:
+        if loop_statuses[k] in ("pending", "active"):
+            loop_statuses[k] = "done"
+    render_steps(loop_statuses, step_container)
+
+    # Show reviewer score + loop count if available
+    lr = result.get("loop_results", {})
+    if isinstance(lr, dict) and lr.get("loops_used"):
+        score_txt = f"Score: **{lr.get('review_score', '?')}/10**"
+        pass_txt  = "✅ Passed" if lr.get("passed") else f"⚠️ Best in {lr['loops_used']} attempt(s)"
+        with step_container:
+            st.markdown(
+                f"<small style='color:#aaa'>🤖 Autonomous loop: {pass_txt} &ensp;|&ensp; {score_txt}</small>",
+                unsafe_allow_html=True,
+            )
 
     # Show reply
     resp_placeholder.write(result["chat_reply"])

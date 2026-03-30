@@ -120,3 +120,112 @@ overall_score = average of all 6 field scores (rounded to nearest integer)"""
     review["passed"] = score >= PASS_THRESHOLD
 
     return review
+
+
+# ── CAMPUS WORKFLOW REVIEWER ─────────────────────────────────────────
+# Scores a CampusFlow pipeline result (classify → policy → notify).
+# Separate from evaluate() to preserve the original startup-validation
+# function signature used by agent/loop.py.
+
+def evaluate_campus_result(
+    query_text: str,
+    workflow_type: str,
+    schema: dict,
+    policy: dict,
+    attempt: int = 1,
+    client=None,
+    model: str = "",
+) -> dict:
+    """
+    Score a campus workflow execution on 6 metrics.
+    Returns same dict shape as evaluate(): {score, passed, feedback, fields}
+    Works WITHOUT an LLM call if client is None (rule-based fallback).
+    """
+    scores = {}
+    notes = {}
+
+    # Metric 1 — Classification: did we get a known workflow type?
+    known_types = {"lab_booking", "room_booking", "leave_request", "complaint", "web_search"}
+    scores["classification"] = 9 if workflow_type in known_types else 4
+    notes["classification"] = (
+        f"Classified as '{workflow_type}'" if workflow_type in known_types
+        else f"Unknown workflow type '{workflow_type}'"
+    )
+
+    # Metric 2 — Schema completeness: key fields extracted?
+    key_fields = {
+        "lab_booking":   ["lab_id", "date"],
+        "room_booking":  ["room_id", "date"],
+        "leave_request": ["leave_type", "start_date"],
+        "complaint":     ["issue_type"],
+    }
+    required = key_fields.get(workflow_type, [])
+    present = [f for f in required if schema.get(f)]
+    if not required:
+        scores["schema"] = 8
+        notes["schema"] = "No required fields for this workflow type"
+    elif len(present) == len(required):
+        scores["schema"] = 9
+        notes["schema"] = "All required fields extracted"
+    else:
+        missing = [f for f in required if f not in present]
+        scores["schema"] = max(3, 9 - (len(missing) * 3))
+        notes["schema"] = f"Missing fields: {missing}"
+
+    # Metric 3 — Policy decision: got a valid decision?
+    policy_result = policy.get("result", "")
+    policy_reason = policy.get("reason", "")
+    if policy_result in ("APPROVED", "REJECTED", "ESCALATED"):
+        scores["policy"] = 9 if len(policy_reason) > 20 else 7
+        notes["policy"] = f"Decision: {policy_result}"
+    else:
+        scores["policy"] = 3
+        notes["policy"] = f"Invalid or missing policy decision: '{policy_result}'"
+
+    # Metric 4 — Alternatives on rejection: helpful?
+    alts = policy.get("alternatives", [])
+    if policy_result == "REJECTED" and alts:
+        scores["alternatives"] = 9
+        notes["alternatives"] = f"{len(alts)} alternative(s) offered"
+    elif policy_result == "REJECTED" and not alts:
+        scores["alternatives"] = 5
+        notes["alternatives"] = "Rejected without alternatives — lower quality"
+    else:
+        scores["alternatives"] = 8  # not applicable
+        notes["alternatives"] = "N/A"
+
+    # Metric 5 — Schema has student context (role info)?
+    has_context = bool(schema.get("student_id") or schema.get("role") or schema.get("department"))
+    scores["context"] = 8 if has_context else 6
+    notes["context"] = "Student context present" if has_context else "No student context in schema"
+
+    # Metric 6 — Attempt penalty: penalise late retries slightly
+    penalty = max(0, (attempt - 1) * 1)
+    scores["attempt"] = max(5, 9 - penalty)
+    notes["attempt"] = f"Attempt {attempt} (penalty={penalty})"
+
+    overall = round(sum(scores.values()) / len(scores))
+    passed = overall >= PASS_THRESHOLD
+
+    # Build feedback for the next retry loop
+    weak = {k: v for k, v in scores.items() if v < 7}
+    if weak:
+        feedback = "Improve: " + "; ".join(f"{k} ({notes[k]})" for k in weak)
+    else:
+        feedback = ""
+
+    fields = [
+        {"field": i + 1, "name": k, "score": scores[k],
+         "status": "pass" if scores[k] >= 7 else ("needs_work" if scores[k] >= 5 else "fail"),
+         "note": notes[k]}
+        for i, k in enumerate(scores)
+    ]
+
+    return {
+        "score": overall,
+        "overall_score": overall,
+        "passed": passed,
+        "fields": fields,
+        "what_is_good": "; ".join(f"{k}: {notes[k]}" for k in scores if scores[k] >= 7),
+        "feedback": feedback,
+    }

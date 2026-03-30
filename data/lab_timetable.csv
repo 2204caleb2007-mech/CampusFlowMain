@@ -1,0 +1,9 @@
+resource,day_of_week,start_time,end_time,department,course
+CS Lab 1,Monday,09:00,11:00,CSE,Data Structures Lab
+CS Lab 2,Tuesday,10:00,12:00,CSE,OS Lab
+Electronics Lab,Wednesday,13:00,15:00,EEE,Circuits Lab
+Mechanical Lab,Thursday,09:00,12:00,MECH,Fluid Mechanics Lab
+Seminar Hall A,Friday,14:00,16:00,CSE,Soft Skills Training
+CS Lab 1,Friday,09:00,11:00,CSE,AI Lab
+CS Lab 1,Monday,14:00,16:00,CSE,Database Management Lab
+CS Lab 2,Tuesday,14:00,16:00,,OS Lab

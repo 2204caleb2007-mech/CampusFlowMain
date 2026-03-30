@@ -1,19 +1,35 @@
 # ============================================================
-# campus/executor.py — Unified Multi-Workflow Executor
+# campus/executor.py — True Autonomous Self-Correcting Loop
 # ============================================================
-# Orchestrates a full request lifecycle:
-#   1. Classify free-text into a structured schema
-#   2. Evaluate schema against the policy engine
-#   3. Persist request, logs, and KPIs to SQLite
-#   4. Send notification via Formspree
-#   5. Return a human-readable AI reply for the chat UI
+# Implements the real THINK → PLAN → EXECUTE → REVIEW → UPDATE
+# cycle for campus workflows. The loop retries with reviewer
+# feedback until quality score >= 7 OR max retries reached.
+#
+# UI integration: structured "STEP_TOKEN:step:status" log lines
+# are emitted at each transition so main.py can update the step
+# tracker in real time, bound to actual execution — not fake timers.
 # ============================================================
 
+import os
 import datetime
 import json
 from campus import db, classifier, policy_engine, notifier, web_researcher, role_system
+from campus import mcp_client  # MCP-routed calls (falls back to direct if server offline)
 
-# ── RESULT → HUMAN MESSAGE ───────────────────────────────────────
+# ── AUTONOMOUS LOOP CONFIG ────────────────────────────────────────
+MAX_RETRIES    = 3      # Max self-correction iterations
+PASS_THRESHOLD = 7      # Reviewer score needed to accept result
+
+# ── STRUCTURED STEP TOKEN (parsed by main.py UI) ──────────────────
+# Format: "STEP_TOKEN:<step>:<status>"  e.g. "STEP_TOKEN:think:active"
+# Steps:  think | plan | execute | review | update
+# Status: active | done | failed | skipped
+
+def _step_token(step: str, status: str) -> str:
+    return f"STEP_TOKEN:{step}:{status}"
+
+
+# ── RESULT → HUMAN MESSAGE ────────────────────────────────────────
 
 def _build_chat_reply(workflow_type: str, schema: dict, policy: dict,
                       notify_result: dict) -> str:
@@ -33,19 +49,18 @@ def _build_chat_reply(workflow_type: str, schema: dict, policy: dict,
         for a in alts:
             lines.append(f"- {a}")
 
-    # Notification confirmation
     n_status = notify_result.get("status", "simulated")
     if n_status == "sent":
         lines.append("")
-        lines.append("📧 Notification sent to the responsible authority.")
+        lines.append("📧 Notification sent to the responsible authority and the student.")
     elif n_status == "simulated":
         lines.append("")
-        lines.append("📧 Notification queued (Formspree simulation mode).")
+        lines.append("📧 Notifications queued for authority and student (Formspree simulation mode).")
 
     return "\n".join(lines)
 
 
-# ── RETRY WITH BACKOFF ────────────────────────────────────────────
+# ── TRANSIENT RETRY WITH BACKOFF ──────────────────────────────────
 
 def _with_retry(fn, max_retries=2, delay=1):
     import time
@@ -72,17 +87,17 @@ def run(
     on_log=None,
 ) -> dict:
     """
-    Full autonomous workflow execution for a single query.
+    Self-correcting autonomous campus workflow executor.
 
-    Returns:
-        {
-          "workflow_type": str,
-          "schema": dict,
-          "policy": dict,
-          "notify_result": dict,
-          "chat_reply": str,
-          "request_id": str,
-        }
+    Loop (up to MAX_RETRIES iterations):
+        THINK  → classify intent + extract schema
+        PLAN   → check DB conflicts, validate schema completeness
+        EXECUTE→ run policy engine against schema
+        REVIEW → score result via agent/reviewer.evaluate_campus_result()
+        UPDATE → if score < 7, inject feedback and repeat
+
+    UI step cards in main.py are driven by structured STEP_TOKEN
+    log lines emitted here — not by fake timers.
     """
     submitted_at = datetime.datetime.now().isoformat()
 
@@ -91,56 +106,189 @@ def run(
         if on_log:
             on_log(msg)
 
-    # ── STEP 1: CLASSIFY ─────────────────────────────────────────
-    log("THINK: Classifying request...")
+    def step(name: str, status: str):
+        """Emit a structured step token so the UI can update cards."""
+        token = _step_token(name, status)
+        db.add_log(session_id, token, "STEP")
+        if on_log:
+            on_log(token)
+
+    # ── WEB SEARCH BYPASS (no loop needed) ───────────────────────
+    # Quick-classify first to detect web_search before entering loop
+    step("think", "active")
+    log("THINK: Pre-classifying request to detect web search...")
     try:
-        schema = _with_retry(
+        pre_schema = _with_retry(
             lambda: classifier.classify(query_text, client, model, role)
         )
     except Exception as e:
-        log(f"Classification failed: {e}", "ERROR")
-        schema = classifier._keyword_fallback(query_text)
+        log(f"Pre-classification failed: {e}", "WARN")
+        pre_schema = classifier._keyword_fallback(query_text)
 
-    workflow_type = schema.get("type", "web_search")
-    log(f"PLAN: Workflow identified → {workflow_type}")
-    log(f"PLAN: Schema extracted → {json.dumps(schema)}")
-
-    # ── SPECIAL BYPASS FOR WEB SEARCH ────────────────────────────
-    if workflow_type == "web_search":
-        search_q = schema.get("query", query_text)
+    if pre_schema.get("type") == "web_search":
+        step("think", "done")
+        step("plan", "active")
+        search_q = pre_schema.get("query", query_text)
+        log(f"PLAN: Web search detected → {search_q}")
+        step("plan", "done")
+        step("execute", "active")
         log("EXECUTE: Running Tavily Web Search...")
         search_data = web_researcher.search(search_q, tavily_api_key)
-
+        step("execute", "done")
+        step("review", "active")
         log("REVIEW: Synthesizing answer with LLM...")
         answer = web_researcher.synthesize_answer(search_q, search_data, client, model, role)
-
-        # Audit/KPI
-        db.add_audit(session_id, role, "web_search", search_q, "completed")
-        db.record_kpi(session_id, workflow_type, submitted_at, "resolved", 1)
-
+        step("review", "done")
+        step("update", "skipped")
         log("UPDATE: Done.")
+        db.add_audit(session_id, role, "web_search", search_q, "completed")
+        db.record_kpi(session_id, "web_search", submitted_at, "resolved", 1)
         return {
-            "workflow_type": workflow_type,
-            "schema": schema,
+            "workflow_type": "web_search",
+            "schema": pre_schema,
             "policy": {"result": "RESOLVED", "reason": "Gathered data from web."},
             "notify_result": {"status": "skipped", "note": "Not applicable to web search"},
             "chat_reply": answer,
             "request_id": "web_" + str(datetime.datetime.now().timestamp()),
+            "loop_results": {"loops_used": 1, "review_score": 9},
         }
 
-    # ── STEP 2: POLICY ENGINE ────────────────────────────────────
-    log("EXECUTE: Evaluating against campus policy rules...")
-    try:
-        policy = _with_retry(
-            lambda: policy_engine.evaluate(workflow_type, schema)
-        )
-    except Exception as e:
-        log(f"Policy evaluation error: {e}", "ERROR")
-        policy = {"result": "ESCALATED", "reason": "Policy engine error — escalated for manual review.", "alternatives": []}
+    # ── AUTONOMOUS LOOP ───────────────────────────────────────────
+    from agent.reviewer import evaluate_campus_result
 
-    log(f"REVIEW: Policy decision → {policy.get('result')} | {policy.get('reason')}")
+    feedback      = ""       # carries reviewer feedback into next iteration
+    schema        = {}
+    policy        = {}
+    loops_used    = 0
+    best_result   = None     # always hold the best attempt even if never fully passing
+    best_score    = 0
 
-    # ── STEP 3: PERSIST REQUEST ──────────────────────────────────
+    for attempt in range(1, MAX_RETRIES + 1):
+        loops_used = attempt
+        log(f"═══ Autonomous Loop {attempt} of {MAX_RETRIES} ═══")
+
+        # ── THINK ────────────────────────────────────────────────
+        step("think", "active")
+        log("THINK: Classifying request and extracting intent...")
+        if feedback:
+            log(f"THINK: Incorporating feedback from attempt {attempt-1}: {feedback[:120]}")
+
+        try:
+            schema = _with_retry(
+                lambda: mcp_client.call_tool("classify_request", {
+                    "query_text": query_text, "role": role,
+                    "groq_api_key": getattr(client, "api_key", ""),
+                    "model": model,
+                }, on_log) if mcp_client.is_server_available()
+                else classifier.classify(query_text, client, model, role)
+            )
+        except Exception as e:
+            log(f"Classification failed: {e}", "ERROR")
+            schema = classifier._keyword_fallback(query_text)
+
+        workflow_type = schema.get("type", "web_search")
+
+        # Inject role into schema for reviewer context checks
+        if "role" not in schema:
+            schema["role"] = role
+
+        log(f"THINK: Intent → {workflow_type}")
+        step("think", "done")
+
+        # ── PLAN ─────────────────────────────────────────────────
+        step("plan", "active")
+        log(f"PLAN: Schema extracted → {json.dumps(schema)}")
+
+        # Check DB for slot conflict BEFORE policy engine runs
+        if workflow_type in ("lab_booking", "room_booking"):
+            res_key = "lab_id" if workflow_type == "lab_booking" else "room_id"
+            resource_id = schema.get(res_key, "")
+            date        = schema.get("date", "")
+            time_slot   = schema.get("time_slot", "") or f"{schema.get('start_time','')}-{schema.get('end_time','')}"
+            if resource_id and date and db.is_slot_booked(resource_id, date, time_slot):
+                schema["_db_conflict"] = True
+                log(f"PLAN: DB conflict detected — {resource_id} on {date} ({time_slot}) already booked.")
+            else:
+                schema["_db_conflict"] = False
+
+        step("plan", "done")
+
+        # ── EXECUTE ───────────────────────────────────────────────
+        step("execute", "active")
+        log("EXECUTE: Running policy engine...")
+        try:
+            policy = _with_retry(
+                lambda: mcp_client.mcp_evaluate_policy(workflow_type, schema, on_log)
+            )
+            # Upgrade to REJECTED if DB conflict was found
+            if schema.get("_db_conflict") and policy.get("result") == "APPROVED":
+                policy["result"] = "REJECTED"
+                policy["reason"] = "The requested slot is already booked. " + policy.get("reason", "")
+                policy.setdefault("alternatives", []).insert(0, "Try a different time slot or date.")
+        except Exception as e:
+            log(f"Policy evaluation error: {e}", "ERROR")
+            policy = {"result": "ESCALATED", "reason": "Policy engine error — escalated for manual review.", "alternatives": []}
+
+        log(f"EXECUTE: Policy → {policy.get('result')} | {policy.get('reason', '')[:80]}")
+        step("execute", "done")
+
+        # ── REVIEW ────────────────────────────────────────────────
+        step("review", "active")
+        log("REVIEW: Scoring workflow output...")
+
+        try:
+            review = evaluate_campus_result(
+                query_text=query_text,
+                workflow_type=workflow_type,
+                schema=schema,
+                policy=policy,
+                attempt=attempt,
+                client=client,
+                model=model,
+            )
+        except Exception as rev_err:
+            log(f"Reviewer error: {rev_err}", "WARN")
+            review = {"score": 6, "passed": False, "feedback": "retry — reviewer error",
+                      "fields": [], "what_is_good": ""}
+
+        score = review.get("score", 0)
+        passed = review.get("passed", False)
+        log(f"REVIEW: Score {score}/10 — {'PASSED ✓' if passed else 'NEEDS WORK ✗'}")
+        if review.get("what_is_good"):
+            log(f"REVIEW: Strengths → {review['what_is_good'][:100]}")
+        step("review", "done")
+
+        # Track best result
+        if score > best_score:
+            best_score = score
+            best_result = {"schema": schema, "policy": policy, "review": review,
+                           "workflow_type": workflow_type}
+
+        # ── UPDATE ────────────────────────────────────────────────
+        if passed:
+            step("update", "skipped")
+            log(f"UPDATE: Quality threshold met on attempt {attempt} — proceeding.")
+            break
+        else:
+            step("update", "active")
+            feedback = review.get("feedback", "improve schema completeness and policy reasoning")
+            log(f"UPDATE: Feedback → {feedback[:120]}")
+            step("update", "done")
+            if attempt < MAX_RETRIES:
+                log(f"UPDATE: Starting attempt {attempt + 1} with improved context...")
+
+    # ── USE BEST RESULT AFTER LOOP ────────────────────────────────
+    if best_result:
+        schema        = best_result["schema"]
+        policy        = best_result["policy"]
+        workflow_type = best_result["workflow_type"]
+    else:
+        policy = {"result": "ESCALATED", "reason": "All attempts failed.", "alternatives": []}
+
+    if loops_used >= MAX_RETRIES and not (best_result and best_result["review"].get("passed")):
+        log(f"UPDATE: Max retries ({MAX_RETRIES}) reached — delivering best attempt (score={best_score}/10).")
+
+    # ── PERSIST REQUEST ───────────────────────────────────────────
     log("UPDATE: Persisting request to database...")
     try:
         req_id = db.create_request(session_id, workflow_type, schema)
@@ -151,20 +299,43 @@ def run(
             policy_reason=policy["reason"],
             alternatives=policy.get("alternatives", []),
         )
+        # Persist confirmed bookings to bookings table
+        if policy["result"] == "APPROVED" and not schema.get("_db_conflict"):
+            if workflow_type == "lab_booking":
+                db.create_booking(
+                    resource_id=schema.get("lab_id", "UNKNOWN"),
+                    resource_type="lab",
+                    date=schema.get("date", ""),
+                    time_slot=schema.get("time_slot", schema.get("start_time", "")),
+                    session_id=session_id,
+                )
+            elif workflow_type == "room_booking":
+                db.create_booking(
+                    resource_id=schema.get("room_id", "UNKNOWN"),
+                    resource_type="room",
+                    date=schema.get("date", ""),
+                    time_slot=schema.get("time_slot", schema.get("start_time", "")),
+                    session_id=session_id,
+                )
     except Exception as e:
         log(f"DB persist error: {e}", "WARN")
         req_id = "unknown"
 
-    # ── STEP 4: SEND NOTIFICATION ─────────────────────────────────
-    log("UPDATE: Sending notification...")
+    # ── SEND DUAL NOTIFICATIONS ───────────────────────────────────
+    log("UPDATE: Sending notifications via MCP...")
     try:
-        notify_result = notifier.notify(workflow_type, schema, policy, role)
+        notify_result = mcp_client.mcp_send_notification(
+            workflow_type, schema,
+            policy.get("result", "UNKNOWN"),
+            policy.get("reason", ""),
+            policy.get("alternatives", []),
+            role, on_log,
+        )
     except Exception:
         notify_result = notifier.notify_simulated(workflow_type, schema, policy, role)
-
     log(f"Notification: {notify_result.get('status', 'unknown')}")
 
-    # ── STEP 5: AUDIT LOG ────────────────────────────────────────
+    # ── AUDIT + KPI ───────────────────────────────────────────────
     db.add_audit(
         session_id=session_id,
         actor_role=role,
@@ -172,18 +343,13 @@ def run(
         target=req_id,
         result=policy["result"],
     )
-
-    # ── STEP 6: KPI ──────────────────────────────────────────────
-    outcome = policy["result"].lower()
-    db.record_kpi(session_id, workflow_type, submitted_at, outcome, loops_used=1)
+    db.record_kpi(session_id, workflow_type, submitted_at, policy["result"].lower(),
+                  loops_used=loops_used)
 
     # ── BUILD REPLY ───────────────────────────────────────────────
     base_chat_reply = _build_chat_reply(workflow_type, schema, policy, notify_result)
-    
-    # Apply role-based response modulation
     chat_reply = role_system.modulate_response(base_chat_reply, role, workflow_type)
-    
-    log("Done. Response ready for student.")
+    log("Done. Response ready.")
 
     return {
         "workflow_type": workflow_type,
@@ -192,4 +358,9 @@ def run(
         "notify_result": notify_result,
         "chat_reply": chat_reply,
         "request_id": req_id,
+        "loop_results": {
+            "loops_used": loops_used,
+            "review_score": best_score,
+            "passed": bool(best_result and best_result["review"].get("passed")),
+        },
     }

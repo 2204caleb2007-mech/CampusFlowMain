@@ -1,0 +1,9 @@
+resource,date,start_time,end_time,booked_by,department,status
+CS Lab 1,2026-04-01,09:00,11:00,STU001,CSE,booked
+CS Lab 1,2026-04-01,11:00,13:00,,CSE,free
+Electronics Lab,2026-04-01,10:00,12:00,STU002,EEE,booked
+CS Lab 2,2026-04-02,14:00,16:00,STU003,IT,booked
+Mechanical Lab,2026-04-01,09:00,13:00,STU004,MECH,booked
+Seminar Hall A,2026-04-01,14:00,17:00,STU005,CSE,booked
+Seminar Hall B,2026-04-02,09:00,13:00,STU006,ECE,booked
+Conference Room,2026-04-01,11:00,12:00,STU001,CSE,booked

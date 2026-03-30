@@ -33,24 +33,11 @@ except ImportError:
     GSPREAD_AVAILABLE = False
 
 
-# ── SAMPLE DATABASE (15 rows) ──────────────────────────────────────
-SAMPLE_SCHEDULE: List[Dict[str, str]] = [
-    {"resource": "CS Lab 1",        "date": "2026-03-30", "start_time": "09:00", "end_time": "11:00", "booked_by": "Dr. Priya",       "department": "CSE",  "status": "booked"},
-    {"resource": "CS Lab 1",        "date": "2026-03-30", "start_time": "11:00", "end_time": "13:00", "booked_by": "Prof. Ramesh",    "department": "CSE",  "status": "booked"},
-    {"resource": "CS Lab 2",        "date": "2026-03-30", "start_time": "09:00", "end_time": "12:00", "booked_by": "Dr. Meena",       "department": "IT",   "status": "booked"},
-    {"resource": "CS Lab 2",        "date": "2026-03-31", "start_time": "14:00", "end_time": "16:00", "booked_by": "Prof. Kumar",     "department": "IT",   "status": "booked"},
-    {"resource": "Electronics Lab", "date": "2026-03-30", "start_time": "10:00", "end_time": "12:00", "booked_by": "Dr. Anand",       "department": "ECE",  "status": "booked"},
-    {"resource": "Electronics Lab", "date": "2026-03-31", "start_time": "09:00", "end_time": "11:00", "booked_by": "Prof. Nair",      "department": "ECE",  "status": "booked"},
-    {"resource": "Mechanical Lab",  "date": "2026-04-01", "start_time": "09:00", "end_time": "13:00", "booked_by": "Dr. Suresh",      "department": "MECH", "status": "booked"},
-    {"resource": "Seminar Hall A",  "date": "2026-03-30", "start_time": "14:00", "end_time": "17:00", "booked_by": "CS Association",  "department": "CSE",  "status": "booked"},
-    {"resource": "Seminar Hall B",  "date": "2026-03-31", "start_time": "09:00", "end_time": "13:00", "booked_by": "IEEE Club",       "department": "ECE",  "status": "booked"},
-    {"resource": "Seminar Hall A",  "date": "2026-04-01", "start_time": "09:00", "end_time": "12:00", "booked_by": "Placement Cell",  "department": "All",  "status": "booked"},
-    {"resource": "Conference Room", "date": "2026-03-30", "start_time": "11:00", "end_time": "12:00", "booked_by": "HOD CSE",         "department": "CSE",  "status": "booked"},
-    {"resource": "Conference Room", "date": "2026-04-02", "start_time": "15:00", "end_time": "17:00", "booked_by": "Principal",       "department": "All",  "status": "booked"},
-    {"resource": "CS Lab 1",        "date": "2026-03-31", "start_time": "09:00", "end_time": "11:00", "booked_by": "",               "department": "",     "status": "available"},
-    {"resource": "CS Lab 2",        "date": "2026-04-01", "start_time": "09:00", "end_time": "11:00", "booked_by": "",               "department": "",     "status": "available"},
-    {"resource": "Seminar Hall B",  "date": "2026-04-01", "start_time": "14:00", "end_time": "17:00", "booked_by": "",               "department": "",     "status": "available"},
-]
+from campus import csv_loader
+
+# OFFLINE FALLBACK:
+#   If credentials are missing, csv_loader fetches lab_schedule.csv instead
+#   of the deprecated SAMPLE_SCHEDULE hardcoded data.
 
 
 def _fetch_from_google_sheets() -> List[Dict[str, str]]:
@@ -100,6 +87,32 @@ def check_availability(resource: str, date: str, start_time: str,
     conflicts = []  # type: ignore
     free_slots = []  # type: ignore
 
+    # Step 1: Check Timetable database constraints first
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d")
+        day_of_week = dt.strftime("%A")
+    except ValueError:
+        day_of_week = ""
+
+    timetable = csv_loader.get_lab_timetable()
+    for row in timetable:
+        if _normalize(row.get("resource", "")) != norm_resource:
+            continue
+        if str(row.get("day_of_week", "")).strip().lower() != day_of_week.lower():
+            continue
+            
+        if _times_overlap(start_time, end_time,
+                          str(row.get("start_time", "")), str(row.get("end_time", ""))):
+            conflicts.append({
+                "resource":   str(row.get("resource", "")),
+                "date":       date,
+                "start_time": str(row.get("start_time", "")),
+                "end_time":   str(row.get("end_time", "")),
+                "booked_by":  f"Timetable: {row.get('course', '')}",
+                "department": str(row.get("department", "")),
+            })
+
+    # Step 2: Check standard schedule bookings (CSV or Google Sheets)
     for row in schedule:
         if _normalize(row.get("resource", "")) != norm_resource:
             continue
@@ -117,7 +130,7 @@ def check_availability(resource: str, date: str, start_time: str,
                     "booked_by":  str(row.get("booked_by", "")),
                     "department": str(row.get("department", "")),
                 })
-        elif status == "available":
+        elif status == "available" or status == "free":
             free_slots.append({
                 "resource":   str(row.get("resource", "")),
                 "date":       str(row.get("date", "")),
@@ -156,8 +169,9 @@ def _extract_booking_fields(form_output: str, classifier_output: str) -> Dict[st
         if not fields["resource"]:
             for key in ["resource", "equipment", "reason_or_topic", "raw_text_snippet"]:
                 val = str(data.get(key) or details.get(key, ""))
-                for candidate in SAMPLE_SCHEDULE:
-                    if _normalize(candidate["resource"]) in val.lower():
+                combined_candidates = csv_loader.get_lab_schedule() + csv_loader.get_lab_timetable()
+                for candidate in combined_candidates:
+                    if candidate.get("resource") and _normalize(candidate["resource"]) in val.lower():
                         fields["resource"] = candidate["resource"]
                         break
                 if fields["resource"]:
@@ -191,9 +205,9 @@ def run(student_request: str, form_output: str, classifier_output: str,
     available, status_msg, conflicts, free_slots, data_source.
     """
     schedule = _fetch_from_google_sheets()
-    data_source = "google_sheets" if schedule else "sample_data"
+    data_source = "google_sheets" if schedule else "csv_data"
     if not schedule:
-        schedule = SAMPLE_SCHEDULE
+        schedule = csv_loader.get_lab_schedule()
 
     fields = _extract_booking_fields(form_output, classifier_output)
 

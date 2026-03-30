@@ -19,10 +19,10 @@ ROLES = {
         "behavior": "Guide, suggest, explain clearly with step-by-step help",
         "icon": "🎓",
     },
-    "teaching_assistant": {
-        "name": "Teaching Assistant (TA)",
-        "display_name": "Teaching Assistant",
-        "description": "A teaching assistant who assists students and may need actionable insights.",
+    "teacher": {
+        "name": "Teacher",
+        "display_name": "Teacher",
+        "description": "A teacher who reviews requests, monitors students, and enforces policies.",
         "tone": "professional, instructional",
         "language_level": "moderately technical",
         "behavior": "Provide actionable insights, enforce academic policies, assist in decision-making",
@@ -83,17 +83,17 @@ You are responding as: **{role_info['display_name']}**
 - Suggest alternatives if the first option isn't available
 - Use emojis appropriately to keep the tone light and approachable
 """
-    elif role == "teaching_assistant":
+    elif role == "teacher":
         role_instruction += """\
-**For TEACHING ASSISTANTS:**
+**For TEACHERS:**
 - Maintain a professional, instructional tone
-- Be concise but thorough — TAs appreciate efficiency
+- Be concise but thorough — Teachers appreciate efficiency
 - Reference academic policies and rules when relevant
 - Provide actionable next steps
 - When escalate is needed, clearly explain the escalation path
 - Offer insights that help with course management
 - Include relevant policy details in your responses
-- Be direct — TAs don't need excessive hand-holding
+- Be direct
 """
     elif role == "admin":
         role_instruction += """\
@@ -152,8 +152,7 @@ def modulate_response(base_response: str, role: str, workflow_type: str = "") ->
 {role_info['icon']} Need help with anything else? Feel free to ask!"""
         return base_response + student_footer
     
-    # TAs get a concise footer
-    elif role == "teaching_assistant":
+    elif role == "teacher":
         ta_footer = f"""
 ---
 {role_info['icon']} View full details in the Automation tab."""
@@ -182,8 +181,8 @@ def get_visible_fields(role: str, data_type: str) -> list[str]:
         if role == "student":
             # Students see limited info about their own requests
             return basic_fields + ["workflow_type", "policy_result", "policy_reason"]
-        elif role == "teaching_assistant":
-            # TAs see more detail but not system internals
+        elif role == "teacher":
+            # Teachers see more detail but not system internals
             return basic_fields + ["workflow_type", "policy_result", "policy_reason", 
                                    "schema_json", "alternatives"]
         else:  # admin
@@ -194,7 +193,7 @@ def get_visible_fields(role: str, data_type: str) -> list[str]:
     elif data_type == "session":
         if role == "student":
             return basic_fields + ["title", "workflow_type"]
-        elif role == "teaching_assistant":
+        elif role == "teacher":
             return basic_fields + ["title", "workflow_type", "role"]
         else:  # admin
             return basic_fields + ["title", "workflow_type", "role", "all_metadata"]
@@ -203,8 +202,8 @@ def get_visible_fields(role: str, data_type: str) -> list[str]:
         if role == "student":
             # Students don't see KPIs
             return []
-        elif role == "teaching_assistant":
-            # TAs see basic KPIs
+        elif role == "teacher":
+            # Teachers see basic KPIs
             return ["total_requests", "resolution_rate_pct"]
         else:  # admin
             # Admins see all KPIs
@@ -214,7 +213,7 @@ def get_visible_fields(role: str, data_type: str) -> list[str]:
     elif data_type == "logs":
         if role == "student":
             return ["timestamp", "message"]  # Only basic log info
-        elif role == "teaching_assistant":
+        elif role == "teacher":
             return ["timestamp", "message", "level"]
         else:  # admin
             return ["timestamp", "message", "level", "stack_trace", "metadata"]
@@ -243,7 +242,7 @@ def can_access(role: str, resource: str, action: str = "read") -> bool:
             "kpi": [],  # No KPI access
             "admin": [],
         },
-        "teaching_assistant": {
+        "teacher": {
             "request": ["read", "write", "admin"],
             "session": ["read", "write"],
             "logs": ["read", "write"],
@@ -272,7 +271,7 @@ def get_access_denied_message(role: str, resource: str, action: str) -> str:
             "kpi": "KPI data is only available to staff and administrators.",
             "admin": "You don't have permission to access administrative functions.",
         },
-        "teaching_assistant": {
+        "teacher": {
             "admin": "You don't have permission to access administrative functions.",
         },
         "admin": {},
