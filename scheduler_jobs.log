@@ -2513,3 +2513,153 @@
 2026-03-30 12:29:37 [INFO] Added job "job_booking_cleanup" to job store "default"
 2026-03-30 12:29:37 [INFO] Scheduler started
 2026-03-30 12:29:37 [INFO] CampusFlow BackgroundScheduler started (module-level singleton).
+2026-03-30 12:31:05 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:36:05 IST)" (scheduled at 2026-03-30 12:31:05.359183+05:30)
+2026-03-30 12:31:05 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:05 IST)" (scheduled at 2026-03-30 12:31:05.359828+05:30)
+2026-03-30 12:31:05 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:05 IST)" (scheduled at 2026-03-30 12:31:05.360108+05:30)
+2026-03-30 12:31:05 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:31:05 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:05 IST)" executed successfully
+2026-03-30 12:31:05 [INFO] [health_log] Total=19 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:31:05 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:05 IST)" executed successfully
+2026-03-30 12:31:05 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:31:05 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:36:05 IST)" executed successfully
+2026-03-30 12:31:25 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:36:25 IST)" (scheduled at 2026-03-30 12:31:25.468290+05:30)
+2026-03-30 12:31:25 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:25 IST)" (scheduled at 2026-03-30 12:31:25.468637+05:30)
+2026-03-30 12:31:25 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:25 IST)" (scheduled at 2026-03-30 12:31:25.468864+05:30)
+2026-03-30 12:31:25 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:31:25 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:36:25 IST)" executed successfully
+2026-03-30 12:31:25 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:31:25 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:25 IST)" executed successfully
+2026-03-30 12:31:25 [INFO] [health_log] Total=19 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:31:25 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:41:25 IST)" executed successfully
+2026-03-30 12:31:38 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:36:38 IST)" (scheduled at 2026-03-30 12:31:38.899585+05:30)
+2026-03-30 12:31:38 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:31:38 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:36:38 IST)" executed successfully
+2026-03-30 12:32:45 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:45 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:45 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:45 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:45 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:45 [INFO] Added job "job_sla_monitor" to job store "default"
+2026-03-30 12:32:45 [INFO] Added job "job_retry_failed" to job store "default"
+2026-03-30 12:32:45 [INFO] Added job "job_health_log" to job store "default"
+2026-03-30 12:32:45 [INFO] Added job "job_data_sync" to job store "default"
+2026-03-30 12:32:45 [INFO] Added job "job_booking_cleanup" to job store "default"
+2026-03-30 12:32:45 [INFO] Scheduler started
+2026-03-30 12:32:45 [INFO] CampusFlow BackgroundScheduler started (module-level singleton).
+2026-03-30 12:32:47 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:47 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:47 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:47 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:47 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-30 12:32:47 [INFO] Added job "job_sla_monitor" to job store "default"
+2026-03-30 12:32:47 [INFO] Added job "job_retry_failed" to job store "default"
+2026-03-30 12:32:47 [INFO] Added job "job_health_log" to job store "default"
+2026-03-30 12:32:47 [INFO] Added job "job_data_sync" to job store "default"
+2026-03-30 12:32:47 [INFO] Added job "job_booking_cleanup" to job store "default"
+2026-03-30 12:32:47 [INFO] Scheduler started
+2026-03-30 12:32:47 [INFO] CampusFlow BackgroundScheduler started (module-level singleton).
+2026-03-30 12:32:47 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:37:47 IST)" (scheduled at 2026-03-30 12:32:47.988598+05:30)
+2026-03-30 12:32:47 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:47 IST)" (scheduled at 2026-03-30 12:32:47.989032+05:30)
+2026-03-30 12:32:47 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:47 IST)" (scheduled at 2026-03-30 12:32:47.989298+05:30)
+2026-03-30 12:32:48 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:32:48 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:37:47 IST)" executed successfully
+2026-03-30 12:32:48 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:32:48 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:47 IST)" executed successfully
+2026-03-30 12:32:48 [INFO] [health_log] Total=19 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:32:48 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:47 IST)" executed successfully
+2026-03-30 12:32:57 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:57 IST)" (scheduled at 2026-03-30 12:32:57.245483+05:30)
+2026-03-30 12:32:57 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:57 IST)" (scheduled at 2026-03-30 12:32:57.245214+05:30)
+2026-03-30 12:32:57 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:37:57 IST)" (scheduled at 2026-03-30 12:32:57.244856+05:30)
+2026-03-30 12:32:57 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:32:57 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:57 IST)" executed successfully
+2026-03-30 12:32:57 [INFO] [health_log] Total=19 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:32:57 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:42:57 IST)" executed successfully
+2026-03-30 12:32:57 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:32:57 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:37:57 IST)" executed successfully
+2026-03-30 12:33:03 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:38:03 IST)" (scheduled at 2026-03-30 12:33:03.548231+05:30)
+2026-03-30 12:33:03 [INFO] Running job "job_data_sync (trigger: interval[0:15:00], next run at: 2026-03-30 12:48:03 IST)" (scheduled at 2026-03-30 12:33:03.549692+05:30)
+2026-03-30 12:33:03 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:33:03 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:38:03 IST)" executed successfully
+2026-03-30 12:33:03 [INFO] [data_sync] CSV caches cleared (attendance + lab schedule) — fresh data on next call
+2026-03-30 12:33:03 [INFO] Job "job_data_sync (trigger: interval[0:15:00], next run at: 2026-03-30 12:48:03 IST)" executed successfully
+2026-03-30 12:33:25 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:38:25 IST)" (scheduled at 2026-03-30 12:33:25.415779+05:30)
+2026-03-30 12:33:25 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:33:25 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:38:25 IST)" executed successfully
+2026-03-30 12:34:28 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:39:28 IST)" (scheduled at 2026-03-30 12:34:28.831067+05:30)
+2026-03-30 12:34:28 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:44:28 IST)" (scheduled at 2026-03-30 12:34:28.831586+05:30)
+2026-03-30 12:34:28 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:44:28 IST)" (scheduled at 2026-03-30 12:34:28.831902+05:30)
+2026-03-30 12:34:28 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:34:28 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:44:28 IST)" executed successfully
+2026-03-30 12:34:28 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:34:28 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:39:28 IST)" executed successfully
+2026-03-30 12:34:28 [INFO] [health_log] Total=19 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:34:28 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:44:28 IST)" executed successfully
+2026-03-30 12:34:37 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:34:37 IST)" (scheduled at 2026-03-30 12:34:37.538965+05:30)
+2026-03-30 12:34:37 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:34:37 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:39:37 IST)" executed successfully
+2026-03-30 12:36:05 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:41:05 IST)" (scheduled at 2026-03-30 12:36:05.359183+05:30)
+2026-03-30 12:36:05 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:36:05 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:41:05 IST)" executed successfully
+2026-03-30 12:36:25 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:41:25 IST)" (scheduled at 2026-03-30 12:36:25.468290+05:30)
+2026-03-30 12:36:25 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:36:25 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:41:25 IST)" executed successfully
+2026-03-30 12:36:31 [INFO] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-30 12:36:32 [INFO] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-30 12:36:32 [WARNING] MCP 'classify_request' attempt 1: HTTP 404: Not Found
+2026-03-30 12:36:33 [WARNING] MCP 'classify_request' attempt 2: HTTP 404: Not Found
+2026-03-30 12:36:35 [WARNING] MCP 'classify_request' attempt 3: HTTP 404: Not Found
+2026-03-30 12:36:35 [WARNING] MCP fallback for 'classify_request': HTTP 404: Not Found
+2026-03-30 12:36:38 [INFO] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-30 12:36:38 [WARNING] MCP 'evaluate_policy' attempt 1: HTTP 404: Not Found
+2026-03-30 12:36:38 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:41:38 IST)" (scheduled at 2026-03-30 12:36:38.899585+05:30)
+2026-03-30 12:36:38 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:46:38 IST)" (scheduled at 2026-03-30 12:36:38.900507+05:30)
+2026-03-30 12:36:38 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:46:38 IST)" (scheduled at 2026-03-30 12:36:38.900136+05:30)
+2026-03-30 12:36:38 [INFO] Running job "job_data_sync (trigger: interval[0:15:00], next run at: 2026-03-30 12:51:38 IST)" (scheduled at 2026-03-30 12:36:38.900890+05:30)
+2026-03-30 12:36:38 [INFO] Running job "job_booking_cleanup (trigger: interval[0:30:00], next run at: 2026-03-30 13:06:38 IST)" (scheduled at 2026-03-30 12:36:38.901176+05:30)
+2026-03-30 12:36:38 [INFO] [data_sync] CSV caches cleared (attendance + lab schedule) — fresh data on next call
+2026-03-30 12:36:38 [INFO] Job "job_data_sync (trigger: interval[0:15:00], next run at: 2026-03-30 12:51:38 IST)" executed successfully
+2026-03-30 12:36:39 [INFO] [booking_cleanup] Expired 0 old booking(s)
+2026-03-30 12:36:39 [INFO] Job "job_booking_cleanup (trigger: interval[0:30:00], next run at: 2026-03-30 13:06:38 IST)" executed successfully
+2026-03-30 12:36:39 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:36:39 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:41:38 IST)" executed successfully
+2026-03-30 12:36:39 [INFO] [health_log] Total=19 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:36:39 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:46:38 IST)" executed successfully
+2026-03-30 12:36:39 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:36:39 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:46:38 IST)" executed successfully
+2026-03-30 12:36:39 [WARNING] MCP 'evaluate_policy' attempt 2: HTTP 404: Not Found
+2026-03-30 12:36:41 [WARNING] MCP 'evaluate_policy' attempt 3: HTTP 404: Not Found
+2026-03-30 12:36:41 [WARNING] MCP fallback for 'evaluate_policy': HTTP 404: Not Found
+2026-03-30 12:36:41 [WARNING] MCP 'send_notification' attempt 1: HTTP 404: Not Found
+2026-03-30 12:36:42 [WARNING] MCP 'send_notification' attempt 2: HTTP 404: Not Found
+2026-03-30 12:36:44 [WARNING] MCP 'send_notification' attempt 3: HTTP 404: Not Found
+2026-03-30 12:36:44 [WARNING] MCP fallback for 'send_notification': HTTP 404: Not Found
+2026-03-30 12:37:45 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:37:45 IST)" (scheduled at 2026-03-30 12:37:45.567680+05:30)
+2026-03-30 12:37:45 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:37:45 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:42:45 IST)" executed successfully
+2026-03-30 12:37:47 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:37:47 IST)" (scheduled at 2026-03-30 12:37:47.550465+05:30)
+2026-03-30 12:37:47 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:37:47 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:42:47 IST)" executed successfully
+2026-03-30 12:37:47 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:42:47 IST)" (scheduled at 2026-03-30 12:37:47.988598+05:30)
+2026-03-30 12:37:48 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:37:48 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:42:47 IST)" executed successfully
+2026-03-30 12:37:57 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:42:57 IST)" (scheduled at 2026-03-30 12:37:57.244856+05:30)
+2026-03-30 12:37:57 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:37:57 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:42:57 IST)" executed successfully
+2026-03-30 12:38:03 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:03 IST)" (scheduled at 2026-03-30 12:38:03.548968+05:30)
+2026-03-30 12:38:03 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:43:03 IST)" (scheduled at 2026-03-30 12:38:03.548231+05:30)
+2026-03-30 12:38:03 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:03 IST)" (scheduled at 2026-03-30 12:38:03.549301+05:30)
+2026-03-30 12:38:03 [INFO] [health_log] Total=20 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:38:03 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:03 IST)" executed successfully
+2026-03-30 12:38:03 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:38:03 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:03 IST)" executed successfully
+2026-03-30 12:38:03 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:38:03 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:43:03 IST)" executed successfully
+2026-03-30 12:38:25 [INFO] Running job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:43:25 IST)" (scheduled at 2026-03-30 12:38:25.415779+05:30)
+2026-03-30 12:38:25 [INFO] Running job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:25 IST)" (scheduled at 2026-03-30 12:38:25.416141+05:30)
+2026-03-30 12:38:25 [INFO] Running job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:25 IST)" (scheduled at 2026-03-30 12:38:25.416398+05:30)
+2026-03-30 12:38:25 [INFO] [sla_monitor] Checked 0 pending | Escalated 0
+2026-03-30 12:38:25 [INFO] Job "job_sla_monitor (trigger: interval[0:05:00], next run at: 2026-03-30 12:43:25 IST)" executed successfully
+2026-03-30 12:38:25 [ERROR] [retry_failed] FAILED: no such column: retry_count
+2026-03-30 12:38:25 [INFO] Job "job_retry_failed (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:25 IST)" executed successfully
+2026-03-30 12:38:25 [INFO] [health_log] Total=20 | Resolved=13 | Failed=0 | Pending=0 | AvgRes=0.1min
+2026-03-30 12:38:25 [INFO] Job "job_health_log (trigger: interval[0:10:00], next run at: 2026-03-30 12:48:25 IST)" executed successfully
